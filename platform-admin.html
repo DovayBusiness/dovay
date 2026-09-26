@@ -7,69 +7,116 @@
 <meta name="robots" content="noindex, nofollow">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.tailwindcss.com"></script>
-<style>body{font-family:Inter,system-ui,sans-serif}</style>
+<style>
+  body{font-family:Inter,system-ui,sans-serif}
+  .toggle-track{transition:background-color .15s ease}
+  .toggle-knob{transition:left .15s ease}
+</style>
 </head>
-<body class="bg-neutral-100 text-neutral-900 min-h-screen">
+<body class="bg-neutral-50 text-neutral-900 min-h-screen">
 
 <div id="login-view" class="min-h-screen flex items-center justify-center p-6">
-  <form id="login-form" class="bg-white border border-neutral-200 rounded-lg p-8 w-full max-w-sm space-y-4">
-    <h1 class="text-lg font-semibold">Platform Control</h1>
-    <p class="text-[13px] text-neutral-500">Sign in with your platform admin account.</p>
+  <form id="login-form" class="bg-white border border-neutral-200 rounded-xl shadow-sm p-8 w-full max-w-sm space-y-4">
     <div>
-      <label class="block text-[12px] text-neutral-600 mb-1">Email</label>
-      <input id="login-email" type="email" required class="w-full border border-neutral-300 rounded px-3 py-2 text-[14px]">
+      <h1 class="text-lg font-semibold">Platform Control</h1>
+      <p class="text-[13px] text-neutral-500 mt-1">Sign in with your platform admin account.</p>
     </div>
     <div>
-      <label class="block text-[12px] text-neutral-600 mb-1">Password</label>
-      <input id="login-password" type="password" required class="w-full border border-neutral-300 rounded px-3 py-2 text-[14px]">
+      <label class="block text-[12px] font-medium text-neutral-600 mb-1">Email</label>
+      <input id="login-email" type="email" required class="w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-neutral-900">
+    </div>
+    <div>
+      <label class="block text-[12px] font-medium text-neutral-600 mb-1">Password</label>
+      <input id="login-password" type="password" required class="w-full border border-neutral-300 rounded-lg px-3 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-neutral-900">
     </div>
     <p id="login-error" class="text-[12px] text-red-600 hidden"></p>
-    <button class="w-full bg-neutral-900 text-white rounded py-2 text-[14px] font-medium">Sign In</button>
+    <button class="w-full bg-neutral-900 text-white rounded-lg py-2.5 text-[14px] font-medium hover:bg-neutral-800 transition-colors">Sign In</button>
   </form>
 </div>
 
-<div id="dashboard-view" class="hidden max-w-6xl mx-auto p-6">
-  <div class="flex items-center justify-between mb-6">
-    <div>
-      <h1 class="text-xl font-semibold">Store Control</h1>
-      <p class="text-[13px] text-neutral-500">Toggle features and set limits per store.</p>
-    </div>
-    <button id="logout-btn" class="text-[13px] border border-neutral-300 rounded px-4 py-2 hover:bg-neutral-50">Log out</button>
-  </div>
-
-  <div id="toast" class="hidden fixed top-4 right-4 bg-neutral-900 text-white text-[13px] px-4 py-2 rounded shadow-lg z-50"></div>
-
-  <div class="grid lg:grid-cols-[1fr_380px] gap-6">
-    <div id="store-list" class="space-y-3"></div>
-
-    <div id="store-detail" class="hidden bg-white border border-neutral-200 rounded-lg p-5 h-fit sticky top-6">
-      <div class="flex items-center justify-between mb-4">
-        <h2 id="detail-title" class="font-semibold text-[15px]"></h2>
-        <button id="detail-close" class="text-neutral-400 hover:text-neutral-700 text-[18px] leading-none">&times;</button>
+<div id="dashboard-view" class="hidden">
+  <header class="bg-white border-b border-neutral-200">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-semibold">Store Control</h1>
+        <p class="text-[13px] text-neutral-500">Manage features and limits across every store.</p>
       </div>
-      <div class="space-y-4 text-[13px]">
+      <button id="logout-btn" class="text-[13px] border border-neutral-300 rounded-lg px-4 py-2 hover:bg-neutral-50">Log out</button>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto p-6">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+      <div class="bg-white border border-neutral-200 rounded-xl p-4">
+        <p class="text-[12px] text-neutral-500">Total stores</p>
+        <p id="stat-total-stores" class="text-2xl font-semibold mt-1">—</p>
+      </div>
+      <div class="bg-white border border-neutral-200 rounded-xl p-4">
+        <p class="text-[12px] text-neutral-500">WhatsApp enabled</p>
+        <p id="stat-whatsapp-on" class="text-2xl font-semibold mt-1">—</p>
+      </div>
+      <div class="bg-white border border-neutral-200 rounded-xl p-4">
+        <p class="text-[12px] text-neutral-500">Reviews enabled</p>
+        <p id="stat-reviews-on" class="text-2xl font-semibold mt-1">—</p>
+      </div>
+      <div class="bg-white border border-neutral-200 rounded-xl p-4">
+        <p class="text-[12px] text-neutral-500">Total products</p>
+        <p id="stat-total-products" class="text-2xl font-semibold mt-1">—</p>
+      </div>
+    </div>
+
+    <div id="store-grid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+  </main>
+</div>
+
+<!-- Manage Store Modal -->
+<div id="manage-modal" class="hidden fixed inset-0 z-50">
+  <div class="absolute inset-0 bg-black/50" id="manage-modal-backdrop"></div>
+  <div class="absolute inset-0 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-auto">
+      <div class="flex items-center justify-between p-5 border-b border-neutral-200">
+        <h2 id="modal-title" class="font-semibold text-[16px]"></h2>
+        <button id="modal-close" class="text-neutral-400 hover:text-neutral-700 text-[20px] leading-none">&times;</button>
+      </div>
+      <div class="p-5 space-y-5 text-[13px]">
         <div class="flex items-center justify-between">
-          <span>WhatsApp ordering</span>
-          <button id="detail-whatsapp-toggle" class="toggle-switch"></button>
+          <div>
+            <p class="font-medium">WhatsApp ordering</p>
+            <p class="text-[12px] text-neutral-500">Customers can order via WhatsApp</p>
+          </div>
+          <button id="modal-whatsapp-toggle" class="toggle-btn"></button>
         </div>
         <div class="flex items-center justify-between">
-          <span>Customer reviews</span>
-          <button id="detail-reviews-toggle" class="toggle-switch"></button>
+          <div>
+            <p class="font-medium">Customer reviews</p>
+            <p class="text-[12px] text-neutral-500">Reviews section visible on the store</p>
+          </div>
+          <button id="modal-reviews-toggle" class="toggle-btn"></button>
         </div>
-        <div>
-          <label class="block text-neutral-600 mb-1">Max products (blank = unlimited)</label>
-          <input id="detail-max-products" type="number" min="0" class="w-full border border-neutral-300 rounded px-3 py-2">
+
+        <div class="pt-4 border-t border-neutral-200">
+          <p class="font-medium mb-2">Product limit</p>
+          <div id="modal-usage-bar-wrap" class="h-2 bg-neutral-100 rounded-full overflow-hidden mb-2">
+            <div id="modal-usage-bar" class="h-full bg-neutral-900" style="width:0%"></div>
+          </div>
+          <p id="modal-usage-text" class="text-[12px] text-neutral-500 mb-3"></p>
+          <div class="flex gap-2">
+            <input id="modal-max-products" type="number" min="0" placeholder="Unlimited" class="flex-1 border border-neutral-300 rounded-lg px-3 py-2 text-[14px] focus:outline-none focus:ring-2 focus:ring-neutral-900">
+            <button id="modal-save-limit" class="bg-neutral-900 text-white rounded-lg px-4 py-2 text-[13px] font-medium hover:bg-neutral-800">Save</button>
+          </div>
+          <p class="text-[11px] text-neutral-400 mt-2">Leave blank for unlimited products.</p>
         </div>
-        <button id="detail-save-limit" class="w-full bg-neutral-900 text-white rounded py-2 font-medium">Save Limit</button>
-        <div class="pt-3 border-t border-neutral-200 text-[12px] text-neutral-500">
-          <p><span class="font-medium text-neutral-700">Owner:</span> <span id="detail-owner"></span></p>
-          <p><span class="font-medium text-neutral-700">Domain:</span> <span id="detail-domain"></span></p>
-          <p><span class="font-medium text-neutral-700">Products:</span> <span id="detail-product-count"></span></p>
+
+        <div class="pt-4 border-t border-neutral-200 text-[12px] text-neutral-500 space-y-1">
+          <p><span class="font-medium text-neutral-700">Owner:</span> <span id="modal-owner"></span></p>
+          <p><span class="font-medium text-neutral-700">Domain:</span> <span id="modal-domain"></span></p>
         </div>
       </div>
     </div>
   </div>
 </div>
+
+<div id="toast" class="hidden fixed top-4 right-4 text-white text-[13px] px-4 py-2.5 rounded-lg shadow-lg z-[60]"></div>
 
 <script>
 const SUPABASE_URL = 'https://fugdpocswpqhklcjxxhe.supabase.co';
@@ -83,7 +130,7 @@ let selectedStoreId = null;
 function showToast(msg, isError) {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.className = 'fixed top-4 right-4 text-white text-[13px] px-4 py-2 rounded shadow-lg z-50 ' + (isError ? 'bg-red-600' : 'bg-neutral-900');
+  t.className = 'fixed top-4 right-4 text-white text-[13px] px-4 py-2.5 rounded-lg shadow-lg z-[60] ' + (isError ? 'bg-red-600' : 'bg-neutral-900');
   setTimeout(() => t.classList.add('hidden'), 2500);
 }
 
@@ -141,89 +188,102 @@ async function loadStores() {
     (productRows || []).forEach(p => { productCounts[p.store_id] = (productCounts[p.store_id] || 0) + 1; });
   }
 
-  renderStoreList();
-  if (selectedStoreId) renderDetail(selectedStoreId);
+  renderStats();
+  renderStoreGrid();
+  if (selectedStoreId) renderModal(selectedStoreId);
 }
 
-function toggleSwitchHtml(on) {
-  return `<span class="block w-10 h-6 rounded-full transition-colors ${on ? 'bg-green-600' : 'bg-neutral-300'} relative">
-    <span class="absolute top-0.5 ${on ? 'left-[18px]' : 'left-0.5'} w-5 h-5 bg-white rounded-full transition-all shadow"></span>
+function renderStats() {
+  document.getElementById('stat-total-stores').textContent = stores.length;
+  document.getElementById('stat-whatsapp-on').textContent = stores.filter(s => s.feature_whatsapp).length;
+  document.getElementById('stat-reviews-on').textContent = stores.filter(s => s.feature_reviews).length;
+  document.getElementById('stat-total-products').textContent = Object.values(productCounts).reduce((a, b) => a + b, 0);
+}
+
+function badge(on, label) {
+  return `<span class="inline-flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-full ${on ? 'bg-green-50 text-green-700' : 'bg-neutral-100 text-neutral-500'}">
+    <span class="w-1.5 h-1.5 rounded-full ${on ? 'bg-green-600' : 'bg-neutral-400'}"></span>${label}
   </span>`;
 }
 
-function renderStoreList() {
-  const wrap = document.getElementById('store-list');
+function renderStoreGrid() {
+  const wrap = document.getElementById('store-grid');
   wrap.innerHTML = stores.map(s => {
     const count = productCounts[s.store_id] || 0;
-    const limit = s.max_products === null ? '∞' : s.max_products;
+    const limitLabel = s.max_products === null ? 'Unlimited' : `${count} / ${s.max_products}`;
+    const pct = s.max_products ? Math.min(100, Math.round((count / s.max_products) * 100)) : 0;
     return `
-    <div class="bg-white border ${selectedStoreId === s.store_id ? 'border-neutral-900' : 'border-neutral-200'} rounded-lg p-4 cursor-pointer" data-select-id="${s.store_id}">
-      <div class="flex items-center justify-between">
+    <div class="bg-white border border-neutral-200 rounded-xl p-5 hover:border-neutral-300 transition-colors">
+      <div class="flex items-start justify-between mb-3">
         <div>
-          <p class="font-medium text-[14px]">${s.store_id}</p>
-          <p class="text-[12px] text-neutral-500">${s.domain || 'no domain set'} · ${count}/${limit} products</p>
-        </div>
-        <div class="flex items-center gap-4" data-stop-select>
-          <label class="flex items-center gap-2 text-[12px] text-neutral-600">WhatsApp
-            <button class="quick-toggle" data-store="${s.store_id}" data-field="feature_whatsapp" data-on="${s.feature_whatsapp}">${toggleSwitchHtml(s.feature_whatsapp)}</button>
-          </label>
-          <label class="flex items-center gap-2 text-[12px] text-neutral-600">Reviews
-            <button class="quick-toggle" data-store="${s.store_id}" data-field="feature_reviews" data-on="${s.feature_reviews}">${toggleSwitchHtml(s.feature_reviews)}</button>
-          </label>
+          <p class="font-semibold text-[15px]">${s.store_id}</p>
+          <p class="text-[12px] text-neutral-500">${s.domain || 'no domain set'}</p>
         </div>
       </div>
+      <div class="flex gap-2 mb-4">
+        ${badge(s.feature_whatsapp, 'WhatsApp')}
+        ${badge(s.feature_reviews, 'Reviews')}
+      </div>
+      <div class="mb-4">
+        <div class="flex justify-between text-[11px] text-neutral-500 mb-1">
+          <span>Products</span><span>${limitLabel}</span>
+        </div>
+        ${s.max_products ? `<div class="h-1.5 bg-neutral-100 rounded-full overflow-hidden"><div class="h-full bg-neutral-900" style="width:${pct}%"></div></div>` : ''}
+      </div>
+      <button class="manage-btn w-full border border-neutral-300 rounded-lg py-2 text-[13px] font-medium hover:bg-neutral-50" data-store="${s.store_id}">Manage</button>
     </div>`;
-  }).join('') || '<p class="text-[13px] text-neutral-500">No stores yet.</p>';
+  }).join('') || '<p class="text-[13px] text-neutral-500 col-span-full">No stores yet.</p>';
 }
 
-document.getElementById('store-list').addEventListener('click', async (e) => {
-  const quickToggle = e.target.closest('.quick-toggle');
-  if (quickToggle) {
-    const storeId = quickToggle.dataset.store;
-    const field = quickToggle.dataset.field;
-    const newVal = quickToggle.dataset.on !== 'true';
-    const { error } = await sb.from('stores').update({ [field]: newVal }).eq('store_id', storeId);
-    if (error) { showToast('Update failed: ' + error.message, true); return; }
-    showToast('Saved');
-    await loadStores();
-    return;
-  }
-  const card = e.target.closest('[data-select-id]');
-  if (card) {
-    selectedStoreId = card.dataset.selectId;
-    renderStoreList();
-    renderDetail(selectedStoreId);
-  }
+document.getElementById('store-grid').addEventListener('click', (e) => {
+  const btn = e.target.closest('.manage-btn');
+  if (!btn) return;
+  selectedStoreId = btn.dataset.store;
+  renderModal(selectedStoreId);
+  document.getElementById('manage-modal').classList.remove('hidden');
 });
 
-function renderDetail(storeId) {
+function toggleBtnHtml(on) {
+  return `<span class="toggle-track block w-11 h-6 rounded-full ${on ? 'bg-green-600' : 'bg-neutral-300'} relative">
+    <span class="toggle-knob absolute top-0.5 ${on ? 'left-[22px]' : 'left-0.5'} w-5 h-5 bg-white rounded-full shadow"></span>
+  </span>`;
+}
+
+function renderModal(storeId) {
   const s = stores.find(st => st.store_id === storeId);
   if (!s) return;
-  document.getElementById('store-detail').classList.remove('hidden');
-  document.getElementById('detail-title').textContent = s.store_id;
-  document.getElementById('detail-owner').textContent = s.owner_email;
-  document.getElementById('detail-domain').textContent = s.domain || '—';
-  document.getElementById('detail-product-count').textContent = (productCounts[s.store_id] || 0) + (s.max_products === null ? ' (unlimited)' : ' / ' + s.max_products);
-  document.getElementById('detail-max-products').value = s.max_products === null ? '' : s.max_products;
+  const count = productCounts[s.store_id] || 0;
 
-  const waBtn = document.getElementById('detail-whatsapp-toggle');
-  waBtn.innerHTML = toggleSwitchHtml(s.feature_whatsapp);
+  document.getElementById('modal-title').textContent = s.store_id;
+  document.getElementById('modal-owner').textContent = s.owner_email;
+  document.getElementById('modal-domain').textContent = s.domain || '—';
+  document.getElementById('modal-max-products').value = s.max_products === null ? '' : s.max_products;
+
+  const pct = s.max_products ? Math.min(100, Math.round((count / s.max_products) * 100)) : 0;
+  document.getElementById('modal-usage-bar').style.width = pct + '%';
+  document.getElementById('modal-usage-text').textContent = s.max_products === null
+    ? `${count} products · unlimited`
+    : `${count} of ${s.max_products} products used`;
+
+  const waBtn = document.getElementById('modal-whatsapp-toggle');
+  waBtn.innerHTML = toggleBtnHtml(s.feature_whatsapp);
   waBtn.dataset.on = s.feature_whatsapp;
   waBtn.dataset.field = 'feature_whatsapp';
 
-  const revBtn = document.getElementById('detail-reviews-toggle');
-  revBtn.innerHTML = toggleSwitchHtml(s.feature_reviews);
+  const revBtn = document.getElementById('modal-reviews-toggle');
+  revBtn.innerHTML = toggleBtnHtml(s.feature_reviews);
   revBtn.dataset.on = s.feature_reviews;
   revBtn.dataset.field = 'feature_reviews';
 }
 
-document.getElementById('detail-close').addEventListener('click', () => {
+function closeModal() {
   selectedStoreId = null;
-  document.getElementById('store-detail').classList.add('hidden');
-  renderStoreList();
-});
+  document.getElementById('manage-modal').classList.add('hidden');
+}
+document.getElementById('modal-close').addEventListener('click', closeModal);
+document.getElementById('manage-modal-backdrop').addEventListener('click', closeModal);
 
-async function toggleDetailField(btn) {
+async function toggleModalField(btn) {
   const storeId = selectedStoreId;
   const field = btn.dataset.field;
   const newVal = btn.dataset.on !== 'true';
@@ -232,12 +292,12 @@ async function toggleDetailField(btn) {
   showToast('Saved');
   await loadStores();
 }
-document.getElementById('detail-whatsapp-toggle').addEventListener('click', (e) => toggleDetailField(e.currentTarget));
-document.getElementById('detail-reviews-toggle').addEventListener('click', (e) => toggleDetailField(e.currentTarget));
+document.getElementById('modal-whatsapp-toggle').addEventListener('click', (e) => toggleModalField(e.currentTarget));
+document.getElementById('modal-reviews-toggle').addEventListener('click', (e) => toggleModalField(e.currentTarget));
 
-document.getElementById('detail-save-limit').addEventListener('click', async () => {
+document.getElementById('modal-save-limit').addEventListener('click', async () => {
   if (!selectedStoreId) return;
-  const raw = document.getElementById('detail-max-products').value.trim();
+  const raw = document.getElementById('modal-max-products').value.trim();
   const value = raw === '' ? null : parseInt(raw, 10);
   if (raw !== '' && (isNaN(value) || value < 0)) { showToast('Enter a valid number or leave blank for unlimited', true); return; }
   const { error } = await sb.from('stores').update({ max_products: value }).eq('store_id', selectedStoreId);
