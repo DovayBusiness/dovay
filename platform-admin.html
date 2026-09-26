@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Platform Control</title>
+<meta name="robots" content="noindex, nofollow">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>body{font-family:Inter,system-ui,sans-serif}</style>
+</head>
+<body class="bg-neutral-100 text-neutral-900 min-h-screen">
+
+<div id="login-view" class="min-h-screen flex items-center justify-center p-6">
+  <form id="login-form" class="bg-white border border-neutral-200 rounded-lg p-8 w-full max-w-sm space-y-4">
+    <h1 class="text-lg font-semibold">Platform Control</h1>
+    <p class="text-[13px] text-neutral-500">Sign in with your platform admin account.</p>
+    <div>
+      <label class="block text-[12px] text-neutral-600 mb-1">Email</label>
+      <input id="login-email" type="email" required class="w-full border border-neutral-300 rounded px-3 py-2 text-[14px]">
+    </div>
+    <div>
+      <label class="block text-[12px] text-neutral-600 mb-1">Password</label>
+      <input id="login-password" type="password" required class="w-full border border-neutral-300 rounded px-3 py-2 text-[14px]">
+    </div>
+    <p id="login-error" class="text-[12px] text-red-600 hidden"></p>
+    <button class="w-full bg-neutral-900 text-white rounded py-2 text-[14px] font-medium">Sign In</button>
+  </form>
+</div>
+
+<div id="dashboard-view" class="hidden max-w-6xl mx-auto p-6">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-xl font-semibold">Store Control</h1>
+      <p class="text-[13px] text-neutral-500">Toggle features and set limits per store.</p>
+    </div>
+    <button id="logout-btn" class="text-[13px] border border-neutral-300 rounded px-4 py-2 hover:bg-neutral-50">Log out</button>
+  </div>
+
+  <div id="toast" class="hidden fixed top-4 right-4 bg-neutral-900 text-white text-[13px] px-4 py-2 rounded shadow-lg z-50"></div>
+
+  <div class="grid lg:grid-cols-[1fr_380px] gap-6">
+    <div id="store-list" class="space-y-3"></div>
+
+    <div id="store-detail" class="hidden bg-white border border-neutral-200 rounded-lg p-5 h-fit sticky top-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 id="detail-title" class="font-semibold text-[15px]"></h2>
+        <button id="detail-close" class="text-neutral-400 hover:text-neutral-700 text-[18px] leading-none">&times;</button>
+      </div>
+      <div class="space-y-4 text-[13px]">
+        <div class="flex items-center justify-between">
+          <span>WhatsApp ordering</span>
+          <button id="detail-whatsapp-toggle" class="toggle-switch"></button>
+        </div>
+        <div class="flex items-center justify-between">
+          <span>Customer reviews</span>
+          <button id="detail-reviews-toggle" class="toggle-switch"></button>
+        </div>
+        <div>
+          <label class="block text-neutral-600 mb-1">Max products (blank = unlimited)</label>
+          <input id="detail-max-products" type="number" min="0" class="w-full border border-neutral-300 rounded px-3 py-2">
+        </div>
+        <button id="detail-save-limit" class="w-full bg-neutral-900 text-white rounded py-2 font-medium">Save Limit</button>
+        <div class="pt-3 border-t border-neutral-200 text-[12px] text-neutral-500">
+          <p><span class="font-medium text-neutral-700">Owner:</span> <span id="detail-owner"></span></p>
+          <p><span class="font-medium text-neutral-700">Domain:</span> <span id="detail-domain"></span></p>
+          <p><span class="font-medium text-neutral-700">Products:</span> <span id="detail-product-count"></span></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://fugdpocswpqhklcjxxhe.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1Z2Rwb2Nzd3BxaGtsY2p4eGhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3MTY1MzMsImV4cCI6MjEwNTI5MjUzM30.MmHK9ENIJDL5sIscWvZcKgFeFWq3TgavXr3ccbMUhWo';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let stores = [];
+let productCounts = {};
+let selectedStoreId = null;
+
+function showToast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'fixed top-4 right-4 text-white text-[13px] px-4 py-2 rounded shadow-lg z-50 ' + (isError ? 'bg-red-600' : 'bg-neutral-900');
+  setTimeout(() => t.classList.add('hidden'), 2500);
+}
+
+async function checkAuth() {
+  const { data } = await sb.auth.getSession();
+  const session = data.session;
+  if (!session) { showLogin(); return; }
+  const { data: adminRow } = await sb.from('platform_admins').select('email').eq('email', session.user.email).maybeSingle();
+  if (!adminRow) {
+    await sb.auth.signOut();
+    showLogin('This account is not a platform admin.');
+    return;
+  }
+  showDashboard();
+}
+
+function showLogin(err) {
+  document.getElementById('login-view').classList.remove('hidden');
+  document.getElementById('dashboard-view').classList.add('hidden');
+  const errEl = document.getElementById('login-error');
+  if (err) { errEl.textContent = err; errEl.classList.remove('hidden'); }
+}
+
+async function showDashboard() {
+  document.getElementById('login-view').classList.add('hidden');
+  document.getElementById('dashboard-view').classList.remove('hidden');
+  await loadStores();
+}
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.classList.add('hidden');
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) { errEl.textContent = error.message; errEl.classList.remove('hidden'); return; }
+  await checkAuth();
+});
+
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  await sb.auth.signOut();
+  selectedStoreId = null;
+  showLogin();
+});
+
+async function loadStores() {
+  const { data, error } = await sb.from('stores').select('*').order('store_id');
+  if (error) { showToast('Failed to load stores: ' + error.message, true); return; }
+  stores = data || [];
+
+  const { data: productRows, error: prodErr } = await sb.from('products').select('store_id');
+  productCounts = {};
+  if (!prodErr) {
+    (productRows || []).forEach(p => { productCounts[p.store_id] = (productCounts[p.store_id] || 0) + 1; });
+  }
+
+  renderStoreList();
+  if (selectedStoreId) renderDetail(selectedStoreId);
+}
+
+function toggleSwitchHtml(on) {
+  return `<span class="block w-10 h-6 rounded-full transition-colors ${on ? 'bg-green-600' : 'bg-neutral-300'} relative">
+    <span class="absolute top-0.5 ${on ? 'left-[18px]' : 'left-0.5'} w-5 h-5 bg-white rounded-full transition-all shadow"></span>
+  </span>`;
+}
+
+function renderStoreList() {
+  const wrap = document.getElementById('store-list');
+  wrap.innerHTML = stores.map(s => {
+    const count = productCounts[s.store_id] || 0;
+    const limit = s.max_products === null ? '∞' : s.max_products;
+    return `
+    <div class="bg-white border ${selectedStoreId === s.store_id ? 'border-neutral-900' : 'border-neutral-200'} rounded-lg p-4 cursor-pointer" data-select-id="${s.store_id}">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="font-medium text-[14px]">${s.store_id}</p>
+          <p class="text-[12px] text-neutral-500">${s.domain || 'no domain set'} · ${count}/${limit} products</p>
+        </div>
+        <div class="flex items-center gap-4" data-stop-select>
+          <label class="flex items-center gap-2 text-[12px] text-neutral-600">WhatsApp
+            <button class="quick-toggle" data-store="${s.store_id}" data-field="feature_whatsapp" data-on="${s.feature_whatsapp}">${toggleSwitchHtml(s.feature_whatsapp)}</button>
+          </label>
+          <label class="flex items-center gap-2 text-[12px] text-neutral-600">Reviews
+            <button class="quick-toggle" data-store="${s.store_id}" data-field="feature_reviews" data-on="${s.feature_reviews}">${toggleSwitchHtml(s.feature_reviews)}</button>
+          </label>
+        </div>
+      </div>
+    </div>`;
+  }).join('') || '<p class="text-[13px] text-neutral-500">No stores yet.</p>';
+}
+
+document.getElementById('store-list').addEventListener('click', async (e) => {
+  const quickToggle = e.target.closest('.quick-toggle');
+  if (quickToggle) {
+    const storeId = quickToggle.dataset.store;
+    const field = quickToggle.dataset.field;
+    const newVal = quickToggle.dataset.on !== 'true';
+    const { error } = await sb.from('stores').update({ [field]: newVal }).eq('store_id', storeId);
+    if (error) { showToast('Update failed: ' + error.message, true); return; }
+    showToast('Saved');
+    await loadStores();
+    return;
+  }
+  const card = e.target.closest('[data-select-id]');
+  if (card) {
+    selectedStoreId = card.dataset.selectId;
+    renderStoreList();
+    renderDetail(selectedStoreId);
+  }
+});
+
+function renderDetail(storeId) {
+  const s = stores.find(st => st.store_id === storeId);
+  if (!s) return;
+  document.getElementById('store-detail').classList.remove('hidden');
+  document.getElementById('detail-title').textContent = s.store_id;
+  document.getElementById('detail-owner').textContent = s.owner_email;
+  document.getElementById('detail-domain').textContent = s.domain || '—';
+  document.getElementById('detail-product-count').textContent = (productCounts[s.store_id] || 0) + (s.max_products === null ? ' (unlimited)' : ' / ' + s.max_products);
+  document.getElementById('detail-max-products').value = s.max_products === null ? '' : s.max_products;
+
+  const waBtn = document.getElementById('detail-whatsapp-toggle');
+  waBtn.innerHTML = toggleSwitchHtml(s.feature_whatsapp);
+  waBtn.dataset.on = s.feature_whatsapp;
+  waBtn.dataset.field = 'feature_whatsapp';
+
+  const revBtn = document.getElementById('detail-reviews-toggle');
+  revBtn.innerHTML = toggleSwitchHtml(s.feature_reviews);
+  revBtn.dataset.on = s.feature_reviews;
+  revBtn.dataset.field = 'feature_reviews';
+}
+
+document.getElementById('detail-close').addEventListener('click', () => {
+  selectedStoreId = null;
+  document.getElementById('store-detail').classList.add('hidden');
+  renderStoreList();
+});
+
+async function toggleDetailField(btn) {
+  const storeId = selectedStoreId;
+  const field = btn.dataset.field;
+  const newVal = btn.dataset.on !== 'true';
+  const { error } = await sb.from('stores').update({ [field]: newVal }).eq('store_id', storeId);
+  if (error) { showToast('Update failed: ' + error.message, true); return; }
+  showToast('Saved');
+  await loadStores();
+}
+document.getElementById('detail-whatsapp-toggle').addEventListener('click', (e) => toggleDetailField(e.currentTarget));
+document.getElementById('detail-reviews-toggle').addEventListener('click', (e) => toggleDetailField(e.currentTarget));
+
+document.getElementById('detail-save-limit').addEventListener('click', async () => {
+  if (!selectedStoreId) return;
+  const raw = document.getElementById('detail-max-products').value.trim();
+  const value = raw === '' ? null : parseInt(raw, 10);
+  if (raw !== '' && (isNaN(value) || value < 0)) { showToast('Enter a valid number or leave blank for unlimited', true); return; }
+  const { error } = await sb.from('stores').update({ max_products: value }).eq('store_id', selectedStoreId);
+  if (error) { showToast('Update failed: ' + error.message, true); return; }
+  showToast('Product limit saved');
+  await loadStores();
+});
+
+checkAuth();
+</script>
+</body>
+</html>
